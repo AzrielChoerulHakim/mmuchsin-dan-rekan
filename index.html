@@ -244,6 +244,172 @@
             .s2-track { stroke-dashoffset: 0 !important; transition: none !important; }
             * { transition: none !important; }
         }
+/* =========================================================
+   GAVEL SEQUENCE — SCROLL FRAME ENGINE
+   ========================================================= */
+
+#gavel-section {
+    position: relative;
+    height: 500vh;
+    width: 100%;
+    background: #111318;
+    overflow: clip;
+}
+
+#gavel-sticky {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    height: 100svh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Cinematic frame stage */
+#gavel-stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* The actual frame */
+#gavel-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+    will-change: contents;
+}
+
+/* Very subtle cinematic atmosphere */
+#gavel-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    background:
+        radial-gradient(
+            ellipse at center,
+            transparent 45%,
+            rgba(0,0,0,0.18) 100%
+        );
+}
+
+/* Architectural axis */
+#gavel-axis {
+    position: absolute;
+    left: 15%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: rgba(241,228,209,0.12);
+    transform-origin: top center;
+    transform: scaleY(0);
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Small technical metadata */
+#gavel-meta {
+    position: absolute;
+    left: 6vw;
+    top: 12vh;
+    z-index: 20;
+    color: rgba(241,228,209,0.55);
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    line-height: 1.7;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(12px);
+}
+
+#gavel-counter {
+    position: absolute;
+    right: 6vw;
+    bottom: 10vh;
+    z-index: 20;
+    color: rgba(241,228,209,0.5);
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+}
+
+#gavel-counter strong {
+    color: #F1E4D1;
+    font-weight: 500;
+}
+
+/* Intro statement */
+#gavel-statement {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 15;
+    width: 90%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+}
+
+#gavel-statement h2 {
+    margin: 0;
+    color: #F1E4D1;
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2.5rem, 7vw, 8rem);
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+}
+
+#gavel-statement p {
+    margin-top: 24px;
+    color: rgba(241,228,209,0.5);
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+
+    #gavel-section {
+        height: 450vh;
+    }
+
+    #gavel-axis {
+        left: 8%;
+    }
+
+    #gavel-meta {
+        left: 6vw;
+        top: 10vh;
+    }
+
+    #gavel-counter {
+        right: 6vw;
+        bottom: 8vh;
+    }
+
+    #gavel-frame {
+        object-fit: cover;
+    }
+
+}
     </style>
 </head>
 <body class="bg-bone text-ink">
@@ -314,6 +480,57 @@
                         </div>
                     </div>
                 </div>
+            </section>
+
+            <!-- GAVEL SEQUENCE -->
+            <section id="gavel-section">
+
+                <div id="gavel-sticky">
+
+                    <!-- Frame stage -->
+                    <div id="gavel-stage">
+
+                        <img
+                            id="gavel-frame"
+                            src="./frames/frame-0001.jpg"
+                            alt=""
+                            draggable="false"
+                        >
+
+                    </div>
+
+                    <!-- Atmospheric layer -->
+                    <div id="gavel-vignette"></div>
+
+                    <!-- Architectural vertical axis -->
+                    <div id="gavel-axis"></div>
+
+                    <!-- Technical metadata -->
+                    <div id="gavel-meta">
+                        MMR / SYSTEM 02<br>
+                        RESOLUTION ENGINE<br>
+                        STRUCTURAL IMPACT
+                    </div>
+
+                    <!-- Frame counter -->
+                    <div id="gavel-counter">
+                        FRAME <strong id="gavel-frame-number">001</strong> / 192
+                    </div>
+
+                    <!-- Statement -->
+                    <div id="gavel-statement">
+                        <h2>
+                            KEPUTUSAN<br>
+                            MEMBENTUK BATAS.
+                        </h2>
+
+                        <p>
+                            PRESISI / STRUKTUR / RESOLUSI
+                        </p>
+                    </div>
+
+                </div>
+
             </section>
 
             <!-- 02 - TRUST: THE STRUCTURAL LOCK -->
@@ -893,7 +1110,239 @@
                     });
                 }
             }
+// =========================================================
+// 05. GAVEL — 192 FRAME SCROLL ENGINE
+// =========================================================
 
+if (select('#gavel-section') && select('#gavel-frame')) {
+
+    const gavelSection = select('#gavel-section');
+    const gavelFrame = select('#gavel-frame');
+    const gavelCounter = select('#gavel-frame-number');
+    const gavelMeta = select('#gavel-meta');
+    const gavelCounterWrap = select('#gavel-counter');
+    const gavelStatement = select('#gavel-statement');
+    const gavelAxis = select('#gavel-axis');
+
+    const TOTAL_FRAMES = 192;
+
+    let currentFrame = 1;
+    let requestedFrame = 1;
+
+    const frameCache = new Map();
+    let preloadBusy = false;
+
+    // ---------------------------------------------
+    // FRAME PATH
+    // ---------------------------------------------
+
+    const framePath = (index) => {
+        const number = String(index).padStart(4, '0');
+        return `./frames/frame-${number}.jpg`;
+    };
+
+    // ---------------------------------------------
+    // LOAD ONE FRAME
+    // ---------------------------------------------
+
+    const loadFrame = (index) => {
+
+        index = Math.max(1, Math.min(TOTAL_FRAMES, index));
+
+        if (frameCache.has(index)) {
+            return frameCache.get(index);
+        }
+
+        const img = new Image();
+
+        img.src = framePath(index);
+
+        frameCache.set(index, img);
+
+        return img;
+    };
+
+    // ---------------------------------------------
+    // DISPLAY FRAME
+    // ---------------------------------------------
+
+    const displayFrame = (index) => {
+
+        index = Math.max(1, Math.min(TOTAL_FRAMES, index));
+
+        if (index === currentFrame) return;
+
+        requestedFrame = index;
+
+        const cached = frameCache.get(index);
+
+        if (cached && cached.complete && cached.naturalWidth > 0) {
+
+            gavelFrame.src = cached.src;
+
+            currentFrame = index;
+
+            if (gavelCounter) {
+                gavelCounter.textContent =
+                    String(index).padStart(3, '0');
+            }
+
+        } else {
+
+            const img = loadFrame(index);
+
+            img.onload = () => {
+
+                if (requestedFrame === index) {
+
+                    gavelFrame.src = img.src;
+
+                    currentFrame = index;
+
+                    if (gavelCounter) {
+                        gavelCounter.textContent =
+                            String(index).padStart(3, '0');
+                    }
+                }
+            };
+        }
+    };
+
+    // ---------------------------------------------
+    // SMART PRELOAD
+    // Only keeps a small moving window around
+    // the current frame.
+    // ---------------------------------------------
+
+    const preloadAround = (center) => {
+
+        if (preloadBusy) return;
+
+        preloadBusy = true;
+
+        const radius = 10;
+
+        for (
+            let i = Math.max(1, center - radius);
+            i <= Math.min(TOTAL_FRAMES, center + radius);
+            i++
+        ) {
+            loadFrame(i);
+        }
+
+        preloadBusy = false;
+    };
+
+    // ---------------------------------------------
+    // FIRST FRAMES
+    // ---------------------------------------------
+
+    loadFrame(1);
+
+    for (let i = 2; i <= 12; i++) {
+        loadFrame(i);
+    }
+
+    // ---------------------------------------------
+    // INITIAL UI STATE
+    // ---------------------------------------------
+
+    gsap.set(gavelMeta, {
+        opacity: 0,
+        y: 12
+    });
+
+    gsap.set(gavelCounterWrap, {
+        opacity: 0
+    });
+
+    gsap.set(gavelStatement, {
+        opacity: 0,
+        y: 30
+    });
+
+    gsap.set(gavelAxis, {
+        scaleY: 0,
+        transformOrigin: "top center"
+    });
+
+    // ---------------------------------------------
+    // SCROLL ENGINE
+    // ---------------------------------------------
+
+    const gavelTrigger = gsap.timeline({
+
+        scrollTrigger: {
+            trigger: gavelSection,
+            start: "top top",
+            end: "bottom bottom",
+            scrub: 0.15,
+
+            onUpdate: (self) => {
+
+                const progress = self.progress;
+
+                // Map scroll progress to frame number
+                const frame = Math.round(
+                    1 + progress * (TOTAL_FRAMES - 1)
+                );
+
+                displayFrame(frame);
+
+                // Keep nearby frames ready
+                preloadAround(frame);
+            }
+        }
+
+    });
+
+    // ---------------------------------------------
+    // CINEMATIC UI
+    // ---------------------------------------------
+
+    gavelTrigger
+        .to(gavelAxis, {
+            scaleY: 1,
+            duration: 0.15,
+            ease: "none"
+        }, 0.02)
+
+        .to(gavelMeta, {
+            opacity: 1,
+            y: 0,
+            duration: 0.12,
+            ease: "power2.out"
+        }, 0.05)
+
+        .to(gavelCounterWrap, {
+            opacity: 1,
+            duration: 0.12,
+            ease: "power2.out"
+        }, 0.08)
+
+        .to(gavelStatement, {
+            opacity: 1,
+            y: 0,
+            duration: 0.12,
+            ease: "power3.out"
+        }, 0.72)
+
+        .to(gavelStatement, {
+            opacity: 0,
+            y: -20,
+            duration: 0.10,
+            ease: "power2.in"
+        }, 0.94);
+
+    // ---------------------------------------------
+    // REFRESH AFTER IMAGES / LAYOUT
+    // ---------------------------------------------
+
+    window.addEventListener('load', () => {
+        ScrollTrigger.refresh();
+    });
+
+}
             // --- 05. CHAMBER: TRUST ---
             if (select('#chamber')) {
                 gsap.set(".chamber-text-1", { opacity: 0, visibility: "hidden", scale: 0.9, transformOrigin: "50% 50%" });
