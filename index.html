@@ -1048,9 +1048,12 @@ if (select('#gavel-section') && select('#gavel-frame')) {
 
         const img = new Image();
 
+        img.decoding = "async";
+        img.loading = "eager";
         img.src = framePath(index);
 
         frameCache.set(index, img);
+
 
         return img;
     };
@@ -1059,34 +1062,50 @@ if (select('#gavel-section') && select('#gavel-frame')) {
     // DISPLAY FRAME
     // ---------------------------------------------
 
-    const displayFrame = (index) => {
+        const displayFrame = (index) => {
 
-        index = Math.max(1, Math.min(TOTAL_FRAMES, index));
+            index = Math.max(1, Math.min(TOTAL_FRAMES, index));
 
-        if (index === currentFrame) return;
+            if (index === currentFrame) return;
 
-        requestedFrame = index;
+            requestedFrame = index;
 
-        const cached = frameCache.get(index);
+            const cached = frameCache.get(index);
 
-        if (cached && cached.complete && cached.naturalWidth > 0) {
+            if (cached && cached.complete && cached.naturalWidth > 0) {
 
-            gavelFrame.src = cached.src;
+                gavelFrame.src = cached.src;
 
-            currentFrame = index;
+                currentFrame = index;
 
-            if (gavelCounter) {
-                gavelCounter.textContent =
-                    String(index).padStart(3, '0');
+                if (gavelCounter) {
+                    gavelCounter.textContent =
+                        String(index).padStart(3, '0');
+                }
+
+                return;
             }
-
-        } else {
 
             const img = loadFrame(index);
 
-            img.onload = () => {
+            if (img.complete && img.naturalWidth > 0) {
 
-                if (requestedFrame === index) {
+                gavelFrame.src = img.src;
+
+                currentFrame = index;
+
+                if (gavelCounter) {
+                    gavelCounter.textContent =
+                        String(index).padStart(3, '0');
+                }
+
+                return;
+            }
+
+            img.decode()
+                .then(() => {
+
+                    if (requestedFrame !== index) return;
 
                     gavelFrame.src = img.src;
 
@@ -1096,10 +1115,10 @@ if (select('#gavel-section') && select('#gavel-frame')) {
                         gavelCounter.textContent =
                             String(index).padStart(3, '0');
                     }
-                }
-            };
-        }
-    };
+
+                })
+                .catch(() => {});
+        };
 
     // ---------------------------------------------
     // SMART PRELOAD
@@ -1113,7 +1132,7 @@ if (select('#gavel-section') && select('#gavel-frame')) {
 
         preloadBusy = true;
 
-        const radius = 10;
+        const radius = window.innerWidth <= 768 ? 18 : 10;
 
         for (
             let i = Math.max(1, center - radius);
@@ -1169,7 +1188,7 @@ if (select('#gavel-section') && select('#gavel-frame')) {
             trigger: gavelSection,
             start: "top top",
             end: "bottom bottom",
-            scrub: 0.15,
+            scrub: window.innerWidth <= 768 ? 0.28 : 0.15,
 
             onUpdate: (self) => {
 
