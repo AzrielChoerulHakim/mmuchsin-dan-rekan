@@ -269,7 +269,7 @@
     user-select: none;
     -webkit-user-drag: none;
     pointer-events: none;
-    will-change: contents;
+    will-change: auto;
 }
 
 /* Very subtle cinematic atmosphere */
@@ -1004,16 +1004,14 @@
                 }
             }
 // =========================================================
-// 05. GAVEL — 192 FRAME SCROLL ENGINE
+// 05. GAVEL — PERFORMANCE ENGINE V2
+// Scroll-controlled flipbook
 // =========================================================
 
 if (select('#gavel-section') && select('#gavel-frame')) {
 
     const gavelSection = select('#gavel-section');
     const gavelFrame = select('#gavel-frame');
-    const gavelCounter = select('#gavel-frame-number');
-    const gavelMeta = select('#gavel-meta');
-    const gavelCounterWrap = select('#gavel-counter');
     const gavelStatement = select('#gavel-statement');
     const gavelAxis = select('#gavel-axis');
 
@@ -1021,22 +1019,24 @@ if (select('#gavel-section') && select('#gavel-frame')) {
 
     let currentFrame = 1;
     let requestedFrame = 1;
+    let rafPending = false;
 
     const frameCache = new Map();
-    let preloadBusy = false;
 
-    // ---------------------------------------------
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
+    // ---------------------------------------------------------
     // FRAME PATH
-    // ---------------------------------------------
+    // ---------------------------------------------------------
 
     const framePath = (index) => {
         const number = String(index).padStart(4, '0');
         return `./frames/frame-${number}.jpg`;
     };
 
-    // ---------------------------------------------
-    // LOAD ONE FRAME
-    // ---------------------------------------------
+    // ---------------------------------------------------------
+    // LOAD FRAME
+    // ---------------------------------------------------------
 
     const loadFrame = (index) => {
 
@@ -1049,124 +1049,138 @@ if (select('#gavel-section') && select('#gavel-frame')) {
         const img = new Image();
 
         img.decoding = "async";
-        img.loading = "eager";
         img.src = framePath(index);
 
         frameCache.set(index, img);
 
-
         return img;
     };
 
-    // ---------------------------------------------
-    // DISPLAY FRAME
-    // ---------------------------------------------
+    // ---------------------------------------------------------
+    // ACTUALLY DISPLAY FRAME
+    // Only one visual update per browser repaint.
+    // ---------------------------------------------------------
 
-        const displayFrame = (index) => {
+    const renderFrame = () => {
 
-            index = Math.max(1, Math.min(TOTAL_FRAMES, index));
+        rafPending = false;
 
-            if (index === currentFrame) return;
+        if (requestedFrame === currentFrame) return;
 
-            requestedFrame = index;
+        const index = requestedFrame;
+        const img = frameCache.get(index);
 
-            const cached = frameCache.get(index);
+        if (!img || !img.complete || !img.naturalWidth) {
+            return;
+        }
 
-            if (cached && cached.complete && cached.naturalWidth > 0) {
+        gavelFrame.src = img.src;
+        currentFrame = index;
+    };
 
-                gavelFrame.src = cached.src;
+    // ---------------------------------------------------------
+    // REQUEST FRAME
+    // ---------------------------------------------------------
 
-                currentFrame = index;
+    const requestFrame = (index) => {
 
-                if (gavelCounter) {
-                    gavelCounter.textContent =
-                        String(index).padStart(3, '0');
-                }
+        index = Math.max(1, Math.min(TOTAL_FRAMES, index));
 
-                return;
-            }
+        if (index === requestedFrame) return;
 
-            const img = loadFrame(index);
+        requestedFrame = index;
 
-            if (img.complete && img.naturalWidth > 0) {
+        // Make sure requested frame exists.
+        const img = loadFrame(index);
 
-                gavelFrame.src = img.src;
+        // Render only once per animation frame.
+        if (!rafPending) {
 
-                currentFrame = index;
+            rafPending = true;
 
-                if (gavelCounter) {
-                    gavelCounter.textContent =
-                        String(index).padStart(3, '0');
-                }
+            requestAnimationFrame(renderFrame);
+        }
 
-                return;
-            }
+        // If the image is not ready yet,
+        // render immediately after decoding.
+        if (!img.complete || !img.naturalWidth) {
 
             img.decode()
                 .then(() => {
 
                     if (requestedFrame !== index) return;
 
-                    gavelFrame.src = img.src;
-
-                    currentFrame = index;
-
-                    if (gavelCounter) {
-                        gavelCounter.textContent =
-                            String(index).padStart(3, '0');
+                    if (!rafPending) {
+                        rafPending = true;
+                        requestAnimationFrame(renderFrame);
                     }
 
                 })
                 .catch(() => {});
-        };
+        }
+    };
 
-    // ---------------------------------------------
+    // ---------------------------------------------------------
     // SMART PRELOAD
-    // Only keeps a small moving window around
-    // the current frame.
-    // ---------------------------------------------
+    // Smaller window = less memory pressure.
+    // Direction-aware loading.
+    // ---------------------------------------------------------
+
+    let lastRequestedFrame = 1;
 
     const preloadAround = (center) => {
 
-        if (preloadBusy) return;
+        const direction =
+            center >= lastRequestedFrame ? 1 : -1;
 
-        preloadBusy = true;
+        lastRequestedFrame = center;
 
-        const radius = window.innerWidth <= 768 ? 18 : 10;
+        const radius = isMobile ? 8 : 6;
 
-        for (
-            let i = Math.max(1, center - radius);
-            i <= Math.min(TOTAL_FRAMES, center + radius);
-            i++
-        ) {
-            loadFrame(i);
+        // Load frames slightly ahead of the scroll direction.
+        for (let i = 1; i <= radius; i++) {
+
+            const ahead = center + (direction * i);
+
+            if (
+                ahead >= 1 &&
+                ahead <= TOTAL_FRAMES
+            ) {
+                loadFrame(ahead);
+            }
         }
 
-        preloadBusy = false;
+        // Keep the immediate previous frame available
+        // so reversing feels responsive.
+        for (let i = 1; i <= 3; i++) {
+
+            const behind = center - (direction * i);
+
+            if (
+                behind >= 1 &&
+                behind <= TOTAL_FRAMES
+            ) {
+                loadFrame(behind);
+            }
+        }
     };
 
-    // ---------------------------------------------
-    // FIRST FRAMES
-    // ---------------------------------------------
+    // ---------------------------------------------------------
+    // INITIAL LOAD
+    // ---------------------------------------------------------
 
     loadFrame(1);
 
-    for (let i = 2; i <= 12; i++) {
+    // Only preload a small initial batch.
+    const initialFrames = isMobile ? 5 : 8;
+
+    for (let i = 2; i <= initialFrames; i++) {
         loadFrame(i);
     }
 
-    // ---------------------------------------------
-    // INITIAL UI STATE
-    // ---------------------------------------------
-
-    gsap.set(gavelMeta, {
-        opacity: 0,
-        y: 12
-    });
-
-    gsap.set(gavelCounterWrap, {
-        opacity: 0
-    });
+    // ---------------------------------------------------------
+    // INITIAL UI
+    // ---------------------------------------------------------
 
     gsap.set(gavelStatement, {
         opacity: 0,
@@ -1178,97 +1192,88 @@ if (select('#gavel-section') && select('#gavel-frame')) {
         transformOrigin: "top center"
     });
 
-    // ---------------------------------------------
+    // ---------------------------------------------------------
     // SCROLL ENGINE
-    // ---------------------------------------------
+    // ---------------------------------------------------------
 
     const gavelTrigger = gsap.timeline({
 
         scrollTrigger: {
+
             trigger: gavelSection,
+
             start: "top top",
             end: "bottom bottom",
-            scrub: window.innerWidth <= 768 ? 0.28 : 0.15,
+
+            // Slightly smoother on mobile,
+            // without creating excessive interpolation.
+            scrub: isMobile ? 0.35 : 0.2,
 
             onUpdate: (self) => {
 
                 const progress = self.progress;
 
-                // Map scroll progress to frame number
                 const frame = Math.round(
                     1 + progress * (TOTAL_FRAMES - 1)
                 );
 
-                displayFrame(frame);
+                requestFrame(frame);
 
-                // Keep nearby frames ready
                 preloadAround(frame);
             }
         }
 
     });
 
-    // ---------------------------------------------
+    // ---------------------------------------------------------
     // CINEMATIC UI
-    // ---------------------------------------------
+    // ---------------------------------------------------------
 
     gavelTrigger
-    .to("#gavel-stage", {
-        scale: 1.04,
-        duration: 0.28,
-        ease: "none"
-    }, 0)
 
-    .to(gavelAxis, {
-        scaleY: 1,
-        duration: 0.15,
-        ease: "power2.out"
-    }, 0.02)
+        .to("#gavel-stage", {
+            scale: 1.04,
+            duration: 0.28,
+            ease: "none"
+        }, 0)
 
-    .to(gavelMeta, {
-        opacity: 1,
-        y: 0,
-        duration: 0.12,
-        ease: "power2.out"
-    }, 0.05)
+        .to(gavelAxis, {
+            scaleY: 1,
+            duration: 0.15,
+            ease: "power2.out"
+        }, 0.02)
 
-    .to(gavelCounterWrap, {
-        opacity: 1,
-        duration: 0.12,
-        ease: "power2.out"
-    }, 0.08)
+        .to("#gavel-vignette", {
+            opacity: 1,
+            duration: 0.2,
+            ease: "none"
+        }, 0.15)
 
-    .to("#gavel-vignette", {
-        opacity: 1,
-        duration: 0.2,
-        ease: "none"
-    }, 0.15)
+        .to(gavelStatement, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.16,
+            ease: "power3.out"
+        }, 0.68)
 
-    .to(gavelStatement, {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        duration: 0.16,
-        ease: "power3.out"
-    }, 0.68)
+        .to(gavelStatement, {
+            scale: 1.035,
+            duration: 0.14,
+            ease: "none"
+        }, 0.82)
 
-    .to(gavelStatement, {
-        scale: 1.035,
-        duration: 0.14,
-        ease: "none"
-    }, 0.82)
+        .to(gavelStatement, {
+            opacity: 0,
+            y: -30,
+            scale: 1.06,
+            duration: 0.10,
+            ease: "power2.in"
+        }, 0.94);
 
-    .to(gavelStatement, {
-        opacity: 0,
-        y: -30,
-        scale: 1.06,
-        duration: 0.10,
-        ease: "power2.in"
-    }, 0.94);
-
-    // ---------------------------------------------
-    // REFRESH AFTER IMAGES / LAYOUT
-    // ---------------------------------------------
+    // ---------------------------------------------------------
+    // REFRESH
+    // ---------------------------------------------------------
 
     window.addEventListener('load', () => {
         ScrollTrigger.refresh();
