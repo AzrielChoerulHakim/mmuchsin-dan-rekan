@@ -1,0 +1,118 @@
+name: MMR controlled Hero Gavel removal
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  pages: write
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pushed state
+        uses: actions/checkout@v6
+
+      - name: Remove Hero and Gavel safely
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          c = p.read_text(encoding='utf-8')
+
+          def cut_once(text, start, end, label):
+              if text.count(start) != 1:
+                  raise RuntimeError(f'{label}: expected 1 start marker, found {text.count(start)}')
+              if text.count(end) != 1:
+                  raise RuntimeError(f'{label}: expected 1 end marker, found {text.count(end)}')
+              a = text.index(start)
+              b = text.index(end, a + len(start))
+              if b <= a:
+                  raise RuntimeError(f'{label}: invalid marker order')
+              return text[:a] + text[b:]
+
+          # HTML sections: remove only the complete Hero and Gavel blocks.
+          c = cut_once(c, '        <section id="hero"', '        <section id="gavel-section"', 'Hero HTML')
+          c = cut_once(c, '        <section id="gavel-section"', '        <section id="chamber"', 'Gavel HTML')
+
+          # Hero typography CSS.
+          c = cut_once(c, '        .text-hero-massive {', '        .text-chamber-massive {', 'Hero typography CSS')
+
+          # Complete Gavel CSS block.
+          c = cut_once(c, '        /* Gavel sequence */', '        #smooth-content {', 'Gavel CSS')
+
+          # Complete obsolete section-order CSS.
+          c = cut_once(c, '        #smooth-content { display: flex; flex-direction: column; }', '    </style>', 'Section order CSS')
+
+          # Complete Hero JS block.
+          c = cut_once(c, '    if (select(\'#hero\')) {', '    if (select(\'#gavel-section\') && select(\'#gavel-frame\')) {', 'Hero JS')
+
+          # Complete Gavel JS block.
+          c = cut_once(c, '    if (select(\'#gavel-section\') && select(\'#gavel-frame\')) {', '    if (select(\'#chamber\')) {', 'Gavel JS')
+
+          # Logo now returns to the actual opening section.
+          c = c.replace('href="#hero"', 'href="#chamber"')
+
+          # Restore the locked Chamber copy.
+          old1 = '<h2 class="chamber-text-1 font-serif text-3xl sm:text-4xl md:text-5xl lg:text-7xl text-bone text-center tracking-tight w-[90%] max-w-5xl leading-tight m-0 p-0">MOHAMMAD MUCHSIN & REKAN.</h2>'
+          new1 = '<h2 class="chamber-text-1 font-serif text-3xl sm:text-4xl md:text-5xl lg:text-7xl text-bone text-center tracking-tight w-[90%] max-w-5xl leading-tight m-0 p-0">KEPERCAYAAN TIDAK DIJANJIKAN.</h2>'
+          old2 = '<h2 class="chamber-text-2 font-serif text-chamber-massive text-bone text-center m-0 p-0 relative">The Legal Advocate.</h2>'
+          new2 = '<h2 class="chamber-text-2 font-serif text-chamber-massive text-bone text-center m-0 p-0 relative">IA DIBANGUN.</h2>'
+          if c.count(old1) != 1 or c.count(old2) != 1:
+              raise RuntimeError('Chamber copy markers are not exactly where expected')
+          c = c.replace(old1, new1).replace(old2, new2)
+
+          # Normalize only excessive blank lines introduced by block removal.
+          c = re.sub(r'\n{4,}', '\n\n\n', c)
+
+          # Hard validation before anything is committed.
+          forbidden = [
+              'id="hero"', 'id="gavel-section"', 'id="gavel-sticky"', 'id="gavel-frame"',
+              'hero-layer-', 'hero-text-', 'hero-img', 'text-hero-massive', 'office-mmr.png',
+              './frames/', 'frame-0001.jpg', 'gavel-section', 'gavel-frame', 'gavel-statement',
+              'gavelTrigger', 'TOTAL_FRAMES = 192', "select('#hero')", "select('#gavel-section')",
+              '#smooth-content > #hero', '#smooth-content > #gavel-section',
+              'href="#hero"'
+          ]
+          leftovers = [x for x in forbidden if x in c]
+          if leftovers:
+              raise RuntimeError('Forbidden Hero/Gavel references remain: ' + ', '.join(leftovers))
+
+          m = re.search(r'<main id="smooth-wrapper"><div id="smooth-content">\s*(<section[^>]*id="([^"]+)")', c)
+          if not m or m.group(2) != 'chamber':
+              raise RuntimeError('Chamber is not the first section')
+          if 'KEPERCAYAAN TIDAK DIJANJIKAN.' not in c or 'IA DIBANGUN.' not in c:
+              raise RuntimeError('Locked Chamber copy missing')
+
+          p.write_text(c, encoding='utf-8')
+
+      - name: Remove obsolete Hero and Gavel assets
+        run: |
+          git rm -f --ignore-unmatch assets/office-mmr.png
+          git rm -f --ignore-unmatch frames/*.jpg
+
+      - name: Commit verified result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git diff --cached -- index.html | grep -E '^[-+]\s*(<section id="(hero|gavel-section)|#gavel|\.text-hero|if \(select\(\x27#(hero|gavel-section))|href="#hero"|\.frames/|office-mmr)' && exit 1 || true
+          git commit -m "Remove Hero and Gavel opening sequence" || exit 0
+          git push
+
+      - name: Request GitHub Pages rebuild
+        run: |
+          gh api --method POST repos/${{ github.repository }}/pages/builds || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove temporary workflow
+        if: ${{ success() }}
+        run: |
+          git rm -f .github/workflows/mmr-remove-hero-gavel.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Remove temporary recovery workflow"
+          git push
