@@ -31,7 +31,7 @@
                         tighter: '-0.04em',
                         tight: '-0.02em',
                         widest: '0.15em',
-                        micro: '0.2em',
+                        micro: '0.2em'
                     }
                 }
             }
@@ -273,10 +273,46 @@ document.addEventListener("DOMContentLoaded", () => {
             { kicker: 'Penasehat Hukum', title: 'PENASEHAT<br>HUKUM', desc: 'Penanganan perkara tertentu sesuai dengan kebutuhan lembaga ataupun individu yang membutuhkan penasehat untuk merancang strategi hukum dalam sebuah keperluan hukum yang dibutuhkan klien.', mark: 'II' },
             { kicker: 'Layanan Lainnya', title: 'LAYANAN<br>LAINNYA', desc: 'Layanan lain seperti Penawaran Jasa Pendampingan Hukum, Penyusunan Kontrak, maupun hal lain yang masih berkaitan dengan bidang hukum.', mark: 'III' }
         ];
-        let active = 0, busy = false;
-        function changePractice(index) { if (index === active || busy) return; busy = true; const item = practiceData[index]; gsap.timeline({ onComplete: () => { active = index; busy = false; } }).to([kicker, title, desc, mark], { y: -20, opacity: 0, duration: 0.45, stagger: 0.035, ease: 'power2.inOut' }).call(() => { kicker.innerHTML = item.kicker; title.innerHTML = item.title; desc.innerHTML = item.desc; mark.innerHTML = item.mark; counter.textContent = `0${index + 1} / 03`; indexes.forEach((el, i) => { el.classList.toggle('text-navy', i === index); el.classList.toggle('text-navy/25', i !== index); }); }).set([kicker, title, desc, mark], { y: 20 }).to([kicker, title, desc, mark], { y: 0, opacity: 1, duration: 0.7, stagger: 0.05, ease: 'power3.out' }); }
-        indexes.forEach((button, index) => button.addEventListener('click', () => changePractice(index)));
-        ScrollTrigger.create({ trigger: section, start: "top top", end: "bottom bottom", onUpdate: (self) => { let nextIndex = 0; if (self.progress >= 0.666) nextIndex = 2; else if (self.progress >= 0.333) nextIndex = 1; if (nextIndex !== active && !busy) changePractice(nextIndex); } });
+        let active = 0, transition = null, targetIndex = 0;
+        function setPracticeUI(index) {
+            indexes.forEach((el, i) => { el.classList.toggle('text-navy', i === index); el.classList.toggle('text-navy/25', i !== index); });
+            counter.textContent = `0${index + 1} / 03`;
+        }
+        function renderPractice(index) {
+            const item = practiceData[index];
+            kicker.innerHTML = item.kicker; title.innerHTML = item.title; desc.innerHTML = item.desc; mark.innerHTML = item.mark;
+            active = index; targetIndex = index; setPracticeUI(index);
+        }
+        function syncPractice(index) {
+            targetIndex = index;
+            if (index === active && !transition) return;
+            if (transition) transition.kill();
+            const item = practiceData[index];
+            transition = gsap.timeline({ overwrite: true, onComplete: () => { transition = null; active = index; targetIndex = index; } });
+            transition.to([kicker, title, desc, mark], { y: -20, opacity: 0, duration: 0.18, stagger: 0.015, ease: 'power2.in' })
+                .call(() => { kicker.innerHTML = item.kicker; title.innerHTML = item.title; desc.innerHTML = item.desc; mark.innerHTML = item.mark; setPracticeUI(index); })
+                .set([kicker, title, desc, mark], { y: 20 })
+                .to([kicker, title, desc, mark], { y: 0, opacity: 1, duration: 0.28, stagger: 0.02, ease: 'power3.out' });
+        }
+        const practiceST = ScrollTrigger.create({
+            trigger: section,
+            start: 'top top',
+            end: 'bottom bottom',
+            onUpdate: (self) => {
+                const nextIndex = self.progress >= 0.666666 ? 2 : (self.progress >= 0.333333 ? 1 : 0);
+                if (nextIndex !== targetIndex) syncPractice(nextIndex);
+            },
+            onRefresh: (self) => {
+                const nextIndex = self.progress >= 0.666666 ? 2 : (self.progress >= 0.333333 ? 1 : 0);
+                if (!transition && nextIndex !== active) renderPractice(nextIndex);
+            }
+        });
+        indexes.forEach((button, index) => button.addEventListener('click', () => {
+            const targetProgress = index === 0 ? 0.12 : (index === 1 ? 0.50 : 0.88);
+            const targetY = section.offsetTop + (section.offsetHeight * targetProgress);
+            lenis.scrollTo(targetY, { duration: 0.8, lock: false, force: true });
+            syncPractice(index);
+        }));
     }
 });
 </script>
