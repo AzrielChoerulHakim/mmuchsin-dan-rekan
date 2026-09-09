@@ -1,0 +1,71 @@
+name: MMR restore baseline copy
+
+on:
+  push:
+    paths:
+      - '.github/workflows/mmr-restore-baseline-copy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore-copy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Chamber baseline copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old1 = 'KEPERCAYAAN TIDAK DIJANJIKAN.'
+          old2 = 'IA DIBANGUN.'
+          new1 = 'MOHAMMAD MUCHSIN & REKAN.'
+          new2 = 'The Legal Advocate.'
+          if s.count(old1) != 1 or s.count(old2) != 1:
+              raise SystemExit('ABORT: expected current Chamber copy was not found exactly once.')
+          s = s.replace(old1, new1, 1).replace(old2, new2, 1)
+          p.write_text(s, encoding='utf-8')
+          assert s.count(new1) == 1
+          assert s.count(new2) == 1
+          assert s.count(old1) == 0
+          assert s.count(old2) == 0
+          PY
+
+      - name: Validate structure and copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'MOHAMMAD MUCHSIN & REKAN.' index.html
+          grep -Fq 'The Legal Advocate.' index.html
+          test "$(grep -o 'KEPERCAYAAN TIDAK DIJANJIKAN\.' index.html | wc -l)" -eq 0
+          test "$(grep -o 'IA DIBANGUN\.' index.html | wc -l)" -eq 0
+          test "$(grep -o 'id="hero"' index.html | wc -l)" -eq 0
+          test "$(grep -o 'id="gavel-section"' index.html | wc -l)" -eq 0
+          test "$(grep -o 'frame-0001.jpg' index.html | wc -l)" -eq 0
+          grep -Fq 'href="#chamber"' index.html
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('index.html').read_text(encoding='utf-8')
+          start = s.index('<div id="smooth-content">')
+          first_section = s.index('<section', start)
+          if s[first_section:first_section+80].find('id="chamber"') == -1:
+              raise SystemExit('ABORT: Chamber is not the first section.')
+          print('VALIDATION OK')
+          PY
+
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet && { echo 'No copy change needed'; exit 0; }
+          git commit -m 'Restore baseline Chamber copywriting'
+          git push
